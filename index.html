@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Numpang Ngopi — Pesan Online</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+
+  <header class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white p-4 shadow">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <h1 class="text-lg font-semibold">Numpang Ngopi • Mangkal's • Cirebon</h1>
+      <div class="text-sm">Pesan via WhatsApp otomatis</div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-4xl mx-auto p-6 w-full">
+    <section class="grid md:grid-cols-2 gap-6">
+
+      <!-- Menu list -->
+      <div class="space-y-6">
+        <div class="bg-white rounded-lg shadow p-4">
+          <h2 class="font-semibold text-lg mb-3">Coffee</h2>
+          <div id="coffeeList" class="space-y-3"></div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-4">
+          <h2 class="font-semibold text-lg mb-3">Non Coffee</h2>
+          <div id="noncoffeeList" class="space-y-3"></div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-4">
+          <h2 class="font-semibold text-lg mb-3">Add-ons</h2>
+          <div id="addonsList" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- Cart -->
+      <div class="bg-white rounded-lg shadow p-4 sticky top-6">
+        <h2 class="font-semibold text-lg mb-3">Keranjang</h2>
+
+        <div id="cartItems" class="space-y-3 mb-4">
+          <p class="text-sm text-gray-500">Belum ada item.</p>
+        </div>
+
+        <div class="border-t pt-3">
+          <div class="flex justify-between text-gray-600">
+            <div>Subtotal</div>
+            <div id="subtotalText">Rp 0</div>
+          </div>
+          <div class="flex justify-between text-gray-600 mt-2">
+            <div>Biaya layanan</div>
+            <div id="feeText">Rp 0</div>
+          </div>
+          <div class="flex justify-between font-bold text-lg mt-3">
+            <div>Total</div>
+            <div id="totalText">Rp 0</div>
+          </div>
+        </div>
+
+        <div class="mt-4 space-y-2">
+          <input id="customerName" placeholder="Nama pemesan" class="w-full p-2 border rounded" />
+          <input id="customerNote" placeholder="Catatan / alamat (opsional)" class="w-full p-2 border rounded" />
+        </div>
+
+        <div class="mt-4 flex gap-2">
+          <button id="saveBtn" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Simpan & Kirim WA</button>
+          <button id="clearBtn" class="px-3 py-2 bg-gray-200 rounded">Bersihkan</button>
+        </div>
+
+        <p class="text-xs text-gray-500 mt-3">Pesanan akan tersimpan ke Firebase lalu tampil invoice sebelum ke WhatsApp.</p>
+      </div>
+
+    </section>
+  </main>
+
+  <footer class="bg-gray-100 text-center text-sm text-gray-600 py-3">
+    © Numpang Ngopi • Mangkal's
+  </footer>
+
+  <!-- Modal Invoice -->
+  <div id="invoiceModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+      <h3 class="text-lg font-semibold mb-4">Invoice Pesanan</h3>
+      <div id="invoiceContent" class="mb-4 text-sm"></div>
+      <div class="flex justify-end gap-2">
+        <button id="cancelInvoice" class="px-4 py-2 bg-gray-200 rounded">Batal</button>
+        <button id="confirmInvoice" class="px-4 py-2 bg-green-600 text-white rounded">Konfirmasi & Kirim WA</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const FIREBASE_URL = "https://numpang-ngopi-crb-2c1b7-default-rtdb.firebaseio.com";
+const WA_NUMBER = "628984290300"; // 08984290300 -> wa.me format
+const SERVICE_FEE = 0;
+
+const MENU = {
+  coffee: [
+    { id: "kopi_susu_gula_aren", name: "kopi susu gula aren", price: 8000 },
+    { id: "kopi_susu_latte", name: "kopi susu latte", price: 8000 },
+    { id: "americano", name: "Americano", price: 6000 },
+    { id: "capuchino", name: "capuchino", price: 10000 },
+    { id: "taro_coffe", name: "taro coffe", price: 10000 }
+  ],
+  noncoffee: [
+    { id: "taro_latte", name: "taro latte", price: 8000 },
+    { id: "coklat_latte", name: "coklat latte", price: 8000 },
+    { id: "redvelvet_latte", name: "redvelvet latte", price: 8000 }
+  ],
+  addons: [
+    { id: "creamy", name: "Creamy", price: 1000 },
+    { id: "aren", name: "Aren", price: 1000 },
+    { id: "es_batu", name: "Es Batu", price: 100 }
+  ]
+};
+
+let cart = {};
+
+function formatIDR(n) {
+  return "Rp " + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function createMenuList() {
+  MENU.coffee.forEach(it => document.getElementById("coffeeList").appendChild(createRow(it)));
+  MENU.noncoffee.forEach(it => document.getElementById("noncoffeeList").appendChild(createRow(it)));
+  MENU.addons.forEach(it => document.getElementById("addonsList").appendChild(createRow(it,true)));
+}
+
+function createRow(item,isAddon=false) {
+  const wrap=document.createElement("div");
+  wrap.className="flex items-center justify-between";
+  wrap.innerHTML=`
+    <div>
+      <div class="font-medium">${item.name}</div>
+      <div class="text-sm text-gray-500">${formatIDR(item.price)}</div>
+    </div>
+    <input type="number" min="0" value="0" class="w-16 p-1 border rounded text-center" />
+  `;
+  const input=wrap.querySelector("input");
+  input.oninput=()=>{
+    const q=parseInt(input.value)||0;
+    if(q<=0){delete cart[item.id];}
+    else{cart[item.id]={...item,qty:q,addon:isAddon};}
+    renderCart();
+  };
+  return wrap;
+}
+
+function renderCart(){
+  const div=document.getElementById("cartItems");
+  div.innerHTML="";
+  const items=Object.values(cart);
+  if(!items.length){div.innerHTML="<p class='text-sm text-gray-500'>Belum ada item.</p>";}
+  else{
+    items.forEach(it=>{
+      const row=document.createElement("div");
+      row.className="flex items-center justify-between p-2 border rounded";
+      row.innerHTML=`
+        <div>
+          <div class="font-medium">${it.name}${it.addon?" (Add-on)":""}</div>
+          <div class="text-sm text-gray-500">x${it.qty} • ${formatIDR(it.price)}</div>
+        </div>
+      `;
+      div.appendChild(row);
+    });
+  }
+  const t=computeTotals();
+  document.getElementById("subtotalText").textContent=formatIDR(t.subtotal);
+  document.getElementById("feeText").textContent=formatIDR(t.fee);
+  document.getElementById("totalText").textContent=formatIDR(t.total);
+}
+
+function computeTotals(){
+  let subtotal=0;
+  Object.values(cart).forEach(it=>subtotal+=it.price*it.qty);
+  return {subtotal,fee:SERVICE_FEE,total:subtotal+SERVICE_FEE};
+}
+
+// ===== Modal Invoice =====
+const modal=document.getElementById("invoiceModal");
+const content=document.getElementById("invoiceContent");
+const confirmBtn=document.getElementById("confirmInvoice");
+const cancelBtn=document.getElementById("cancelInvoice");
+
+function showInvoice(order,id){
+  let html=`<p><b>Nama:</b> ${order.customerName}</p>`;
+  if(order.customerNote)html+=`<p><b>Catatan:</b> ${order.customerNote}</p>`;
+  html+=`<table class="w-full mt-3 border text-sm"><thead><tr class="bg-gray-100">
+    <th class="border px-2 py-1 text-left">Item</th>
+    <th class="border px-2 py-1">Qty</th>
+    <th class="border px-2 py-1">Harga</th></tr></thead><tbody>`;
+  order.items.forEach(it=>{
+    html+=`<tr>
+      <td class="border px-2 py-1">${it.name}${it.addon?" (Add-on)":""}</td>
+      <td class="border px-2 py-1 text-center">${it.qty}</td>
+      <td class="border px-2 py-1 text-right">${formatIDR(it.price*it.qty)}</td>
+    </tr>`;
+  });
+  html+=`</tbody><tfoot>
+    <tr><td colspan="2" class="border px-2 py-1 text-right font-bold">Subtotal</td><td class="border px-2 py-1 text-right">${formatIDR(order.subtotal)}</td></tr>
+    <tr><td colspan="2" class="border px-2 py-1 text-right font-bold">Total</td><td class="border px-2 py-1 text-right">${formatIDR(order.total)}</td></tr>
+  </tfoot></table>`;
+  if(id)html+=`<p class="mt-2 text-xs text-gray-500">ID Pesanan: ${id}</p>`;
+  content.innerHTML=html;
+  modal.classList.remove("hidden");modal.classList.add("flex");
+  confirmBtn.onclick=()=>sendWA(order,id);
+  cancelBtn.onclick=()=>{modal.classList.add("hidden");modal.classList.remove("flex");};
+}
+
+// ===== Save + Invoice =====
+async function saveAndSend(){
+  const name=document.getElementById("customerName").value.trim();
+  if(!name)return alert("Isi nama pemesan.");
+  const note=document.getElementById("customerNote").value.trim();
+  const items=Object.values(cart);
+  if(!items.length)return alert("Keranjang kosong.");
+  const totals=computeTotals();
+  const order={customerName:name,customerNote:note,items,subtotal:totals.subtotal,fee:totals.fee,total:totals.total,createdAt:Date.now(),status:"new"};
+  try{
+    const res=await fetch(`${FIREBASE_URL}/orders.json`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(order)});
+    const data=await res.json();
+    showInvoice(order,data?.name);
+  }catch(e){console.error(e);alert("Gagal simpan pesanan.");}
+}
+
+function sendWA(order,id){
+  let msg=`Halo saya ingin pesan:%0ANama: ${encodeURIComponent(order.customerName)}%0A`;
+  if(order.customerNote)msg+=`Catatan: ${encodeURIComponent(order.customerNote)}%0A`;
+  msg+=`%0APesanan:%0A`;
+  order.items.forEach(it=>{msg+=`${encodeURIComponent(it.name)} x${it.qty} = ${encodeURIComponent(formatIDR(it.price*it.qty))}%0A`;});
+  msg+=`%0ASubtotal: ${encodeURIComponent(formatIDR(order.subtotal))}%0ATotal: ${encodeURIComponent(formatIDR(order.total))}%0A`;
+  if(id)msg+=`ID Pesanan: ${encodeURIComponent(id)}%0A`;
+  msg+=`%0A(Terima kasih)`;
+  window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`,"_blank");
+  // clear
+  cart={};renderCart();
+  document.querySelectorAll("input[type='number']").forEach(i=>i.value=0);
+  document.getElementById("customerNote").value="";document.getElementById("customerName").value="";
+  modal.classList.add("hidden");modal.classList.remove("flex");
+}
+
+document.getElementById("saveBtn").onclick=saveAndSend;
+document.getElementById("clearBtn").onclick=()=>{if(confirm("Hapus semua item?")){cart={};renderCart();document.querySelectorAll("input[type='number']").forEach(i=>i.value=0);}};
+
+// init
+createMenuList();renderCart();
+</script>
+</body>
+</html>
