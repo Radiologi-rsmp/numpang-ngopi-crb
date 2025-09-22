@@ -107,7 +107,7 @@
 
 <script>
 const FIREBASE_URL = "https://numpang-ngopi-crb-2c1b7-default-rtdb.firebaseio.com";
-const WA_NUMBER = "628984290300"; // 08984290300 -> wa.me format
+const WA_NUMBER = "628984290300"; // nomor admin
 const SERVICE_FEE = 0;
 
 const MENU = {
@@ -236,25 +236,30 @@ async function saveAndSend(){
   }catch(e){console.error(e);alert("Gagal simpan pesanan.");}
 }
 
+// ===== Kirim WhatsApp =====
 function sendWA(order,id){
-  let msg=`Halo saya ingin pesan:%0ANama: ${encodeURIComponent(order.customerName)}%0A`;
+  let msg=`☕ Halo, saya ingin pesan:%0A`;
+  msg+=`Nama: ${encodeURIComponent(order.customerName)}%0A`;
   if(order.customerNote)msg+=`Catatan: ${encodeURIComponent(order.customerNote)}%0A`;
-  msg+=`%0APesanan:%0A`;
-  order.items.forEach(it=>{msg+=`${encodeURIComponent(it.name)} x${it.qty} = ${encodeURIComponent(formatIDR(it.price*it.qty))}%0A`;});
-  msg+=`%0ASubtotal: ${encodeURIComponent(formatIDR(order.subtotal))}%0ATotal: ${encodeURIComponent(formatIDR(order.total))}%0A`;
+  msg+=`%0A--------------------%0APesanan:%0A`;
+  order.items.forEach(it=>{
+    msg+=`- ${encodeURIComponent(it.name)} x${it.qty} = ${encodeURIComponent(formatIDR(it.price*it.qty))}%0A`;
+  });
+  msg+=`--------------------%0A`;
+  msg+=`Subtotal: ${encodeURIComponent(formatIDR(order.subtotal))}%0A`;
+  msg+=`Total: ${encodeURIComponent(formatIDR(order.total))}%0A`;
   if(id)msg+=`ID Pesanan: ${encodeURIComponent(id)}%0A`;
-  msg+=`%0A(Terima kasih)`;
+  msg+=`%0A(Terima kasih 🙏)`;
   window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`,"_blank");
   cart={};renderCart();
   document.querySelectorAll("input[type='number']").forEach(i=>i.value=0);
-  document.getElementById("customerNote").value="";document.getElementById("customerName").value="";
+  document.getElementById("customerNote").value="";
+  document.getElementById("customerName").value="";
   modal.classList.add("hidden");modal.classList.remove("flex");
 }
 
 document.getElementById("saveBtn").onclick=saveAndSend;
 document.getElementById("clearBtn").onclick=()=>{if(confirm("Hapus semua item?")){cart={};renderCart();document.querySelectorAll("input[type='number']").forEach(i=>i.value=0);}};
-
-// init
 createMenuList();renderCart();
 </script>
 </body>
